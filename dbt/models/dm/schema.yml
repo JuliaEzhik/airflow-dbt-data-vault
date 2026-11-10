@@ -1,0 +1,11 @@
+version: 2
+
+models:
+  - name: stat_orders
+    description: Daily order metrics
+    columns:
+      - name: order_date
+        tests: [not_null, unique]
+      - name: orders_count
+      - name: gross_revenue
+      - name: avg_order_value

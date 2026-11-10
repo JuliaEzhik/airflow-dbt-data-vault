@@ -1,0 +1,83 @@
+version: '3.8'
+
+x-airflow-common: &airflow-common
+  image: apache/airflow:2.9.3
+  environment:
+    - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+    - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=true
+    - AIRFLOW__CORE__LOAD_EXAMPLES=false
+    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@pg_airflow:5432/airflow
+    - AIRFLOW__WEBSERVER__SECRET_KEY=dev_webserver_secret
+    - _PIP_ADDITIONAL_REQUIREMENTS=apache-airflow-providers-postgres==5.10.1 dbt-core==1.8.7 dbt-postgres==1.8.2
+    - AIRFLOW_CONN_PG_DWH=postgresql://dwh:dwh@pg_dwh:5432/dwh
+    - DBT_PROFILES_DIR=/opt/airflow/dbt
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./logs:/opt/airflow/logs
+    - ./plugins:/opt/airflow/plugins
+    - ./dbt:/opt/airflow/dbt
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on:
+    pg_airflow:
+      condition: service_healthy
+    pg_dwh:
+      condition: service_healthy
+
+services:
+  pg_airflow:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 5s
+      retries: 5
+      timeout: 5s
+
+  pg_dwh:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=dwh
+      - POSTGRES_PASSWORD=dwh
+      - POSTGRES_DB=dwh
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dwh -d dwh"]
+      interval: 5s
+      retries: 5
+      timeout: 5s
+
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command: -c "airflow db init && airflow users create --role Admin --username admin --password admin --firstname Admin --lastname User --email admin@example.com || true"
+    restart: on-failure
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    restart: unless-stopped
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+

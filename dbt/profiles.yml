@@ -1,0 +1,13 @@
+dv_demo:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: pg_dwh
+      user: dwh
+      password: dwh
+      dbname: dwh
+      port: 5432
+      schema: dv
+      threads: 4
+

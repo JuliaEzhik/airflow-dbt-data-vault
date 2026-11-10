@@ -1,0 +1,18 @@
+name: 'dv_demo'
+version: '1.0'
+config-version: 2
+
+profile: 'dv_demo'
+
+models:
+  dv_demo:
+    +materialized: view
+    staging:
+      +schema: staging
+      +materialized: view
+    dv:
+      +schema: dv
+      +materialized: incremental
+    dm:
+      +schema: dm
+      +materialized: incremental
